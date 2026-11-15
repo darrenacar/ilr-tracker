@@ -1,0 +1,532 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ILR Travel Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one narrow column. Two profile tabs, one status block, then add-trip form and trip list, separated by plain rules. */
+:root {
+  --bg: #F6F7F9;
+  --ink: #111827;
+  --muted: #5B6573;
+  --line: #DCE0E6;
+  --grid: #E6E9EE;
+  --field: #FFFFFF;
+  --accent: #1B47C9;
+  --accent-ink: #FFFFFF;
+  --ok: #17785A;
+  --ok-bg: #E3F3EC;
+  --warn: #8F5B05;
+  --warn-bg: #FBF0D9;
+  --crit: #B8322A;
+  --crit-bg: #FBE4E1;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E131B; --ink: #E8ECF2; --muted: #9AA5B5; --line: #28313F; --grid: #202A38; --field: #151C27;
+    --accent: #7C9CFF; --accent-ink: #0E131B;
+    --ok: #52C99A; --ok-bg: #12302A; --warn: #E6B450; --warn-bg: #33290F; --crit: #FF8277; --crit-bg: #3A1A18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E131B; --ink: #E8ECF2; --muted: #9AA5B5; --line: #28313F; --grid: #202A38; --field: #151C27;
+  --accent: #7C9CFF; --accent-ink: #0E131B;
+  --ok: #52C99A; --ok-bg: #12302A; --warn: #E6B450; --warn-bg: #33290F; --crit: #FF8277; --crit-bg: #3A1A18;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+}
+.wrap { max-width: 720px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2 { margin: 0; text-wrap: balance; }
+h1 { font: 700 26px/1.2 var(--f-body); letter-spacing: -0.01em; }
+h2 { font: 600 16px/1.3 var(--f-body); }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+section { display: grid; gap: 14px; min-width: 0; }
+section + section { border-top: 1px solid var(--line); padding-top: 24px; }
+
+/* Profile tabs */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tab { text-align: left; display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer; font: inherit; min-width: 0; }
+.tab[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tab .n { font-weight: 600; overflow-wrap: anywhere; }
+.tab .v { font: 500 13px var(--f-mono); color: var(--muted); }
+.tab .v.ok { color: var(--ok); } .tab .v.warn { color: var(--warn); } .tab .v.crit { color: var(--crit); }
+.prof { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+
+/* Status */
+.big-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.big { font: 700 72px/1 var(--f-body); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.of { font: 400 15px var(--f-mono); color: var(--muted); }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; margin-left: auto; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.crit { background: var(--crit-bg); color: var(--crit); }
+.meter { height: 8px; background: var(--grid); border-radius: 99px; overflow: hidden; }
+.meter > i { display: block; height: 100%; width: 0; background: var(--ok); }
+.meter.warn > i { background: var(--warn); }
+.meter.crit > i { background: var(--crit); }
+.lead { margin: 0; color: var(--muted); }
+.lead strong { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin: 0; }
+dt { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+dd { margin: 2px 0 0; font: 500 18px/1.3 var(--f-mono); font-variant-numeric: tabular-nums; }
+dd small { display: block; font: 400 13px/1.4 var(--f-body); color: var(--muted); }
+
+.pill.idle { background: var(--grid); color: var(--muted); }
+.meter.time > i { background: var(--accent); }
+.scale { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font: 400 12px var(--f-mono); color: var(--muted); margin-top: 6px; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 6px 0 8px; border-bottom: 1px solid var(--line); }
+td { padding: 10px 0; border-top: 1px solid var(--line); vertical-align: top; }
+tbody tr:first-child td { border-top: 0; }
+th.r, td.r { text-align: right; padding-left: 16px; }
+td.num { font: 500 16px/1.4 var(--f-mono); }
+td.yr b { font-weight: 600; }
+td.yr small { display: block; font: 400 12.5px var(--f-mono); color: var(--muted); }
+tr.ahead td { color: var(--muted); }
+tr.total td { border-top: 2px solid var(--line); font-weight: 600; }
+
+/* Form */
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > label, .field > .lab { font-size: 13px; font-weight: 600; }
+.hint { font-weight: 400; color: var(--muted); }
+input[type="text"], input[type="date"] { width: 100%; min-width: 0; font: 400 15px var(--f-body); color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+input[type="date"] { font-family: var(--f-mono); font-size: 14px; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+form { display: grid; gap: 14px; }
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--field); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 9px 8px; text-align: center; cursor: pointer; font-weight: 500; font-size: 14px; }
+.seg input:checked + label { background: var(--accent); color: var(--accent-ink); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -3px; }
+.btns { display: flex; flex-wrap: wrap; gap: 10px; }
+button { font: 600 14px var(--f-body); border-radius: 8px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.link { border: 0; padding: 4px 2px; font-size: 13px; color: var(--accent); }
+button.link.danger { color: var(--crit); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.draft { font-size: 13.5px; color: var(--muted); min-height: 1.5em; margin: 0; }
+.draft.ok { color: var(--ok); } .draft.warn { color: var(--warn); } .draft.crit { color: var(--crit); }
+.err { color: var(--crit); font-size: 13.5px; margin: 0; min-height: 1.3em; }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+
+/* Trip list */
+.list-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+ul.trips { list-style: none; margin: 0; padding: 0; }
+.trip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+.place { font-weight: 600; overflow-wrap: anywhere; }
+.dates { font: 400 13px var(--f-mono); color: var(--muted); margin-top: 2px; }
+.tnote { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.side { text-align: right; display: grid; justify-items: end; align-content: start; gap: 2px; }
+.days { font: 500 18px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; }
+.days small { font: 400 12px var(--f-body); color: var(--muted); }
+.tag { display: inline-block; font: 500 10.5px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: 2px; }
+.tag.now { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.tag.plan { border-style: dashed; }
+.empty { border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); }
+.foot { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+@media (prefers-reduced-motion: no-preference) { .meter > i { transition: width 0.4s ease; } }
+@media (max-width: 480px) { .big { font-size: 60px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>ILR Travel Tracker</h1>
+    <p class="sub">Days outside the UK in any 12 months, against the 180-day limit.</p>
+  </header>
+
+  <section aria-label="Profiles">
+    <div class="tabs" id="tabs"></div>
+    <div class="prof">
+      <div class="field"><label for="pName">Name</label><input type="text" id="pName" autocomplete="off"></div>
+      <div class="field"><label for="pArrival">Arrived in the UK</label><input type="date" id="pArrival"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-apply">
+    <h2 id="h-apply">Countdown to applying for ILR</h2>
+    <div class="big-row"><span class="big" id="cdVal">0</span><span class="of" id="cdUnit">days</span><span class="pill idle" id="cdPill">Not open yet</span></div>
+    <div>
+      <div class="meter time" id="cdMeter"><i id="cdFill"></i></div>
+      <div class="scale"><span id="cdFrom"></span><span id="cdPct"></span><span id="cdTo"></span></div>
+    </div>
+    <p class="lead" id="cdText"></p>
+    <dl class="facts">
+      <div><dt>Earliest you can apply</dt><dd id="cdApply"></dd><small>28 days before five years complete</small></div>
+      <div><dt>Five years complete</dt><dd id="cdFive"></dd><small id="cdFiveSub"></small></div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="h-years">
+    <h2 id="h-years">Days outside the UK over the five years</h2>
+    <div class="big-row"><span class="big" id="cumVal">0</span><span class="of">days so far</span></div>
+    <p class="lead" id="cumText"></p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Year in the UK</th><th scope="col" class="r">Days away</th><th scope="col" class="r">Running total</th></tr></thead>
+        <tbody id="yearsBody"></tbody>
+      </table>
+    </div>
+    <p class="note">There is no cap on the five-year total. The 180-day limit applies to every 12-month period, shown below.</p>
+  </section>
+
+  <section aria-labelledby="h-status">
+    <h2 id="h-status">Last 12 months</h2>
+    <div class="big-row"><span class="big" id="nowVal">0</span><span class="of">of 180 days</span><span class="pill ok" id="nowPill">Within the limit</span></div>
+    <div class="meter" id="meter"><i id="meterFill"></i></div>
+    <p class="lead" id="nowText"></p>
+    <dl class="facts">
+      <div><dt>Busiest 12 months</dt><dd id="peakVal">0 days</dd><small id="peakSub"></small></div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="h-add">
+    <h2 id="h-add">Add a trip</h2>
+    <form id="tripForm" novalidate>
+      <div class="field">
+        <span class="lab" id="kindLab">Type</span>
+        <div class="seg" role="radiogroup" aria-labelledby="kindLab">
+          <input type="radio" name="kind" id="kind-holiday" value="holiday" checked>
+          <label for="kind-holiday">Holiday</label>
+          <input type="radio" name="kind" id="kind-business" value="business">
+          <label for="kind-business">Business</label>
+        </div>
+      </div>
+      <div class="field"><label for="place">Destination</label><input type="text" id="place" autocomplete="off" placeholder="e.g. Lisbon, Portugal"></div>
+      <div class="row2">
+        <div class="field"><label for="exitDate">Left the UK</label><input type="date" id="exitDate"></div>
+        <div class="field"><label for="entryDate">Returned <span class="hint">(blank if still away)</span></label><input type="date" id="entryDate"></div>
+      </div>
+      <div class="field"><label for="note">Note <span class="hint">(optional)</span></label><input type="text" id="note" autocomplete="off"></div>
+      <p class="draft" id="draft" aria-live="polite"></p>
+      <p class="err" id="formErr" role="alert"></p>
+      <div class="btns">
+        <button type="submit" class="primary" id="saveBtn">Add trip</button>
+        <button type="button" id="cancelBtn" hidden>Cancel edit</button>
+      </div>
+    </form>
+    <p class="note" id="syncNote">Connecting…</p>
+  </section>
+
+  <section aria-labelledby="h-list">
+    <div class="list-head"><h2 id="h-list">Trips</h2><span class="note" id="listCount"></span></div>
+    <div id="listBody"></div>
+  </section>
+
+  <p class="foot">Counts whole days away: the days you leave and return are not counted. Uses the 180-days-in-any-12-months limit for the 5-year route. Rules differ by route and can change, so confirm on gov.uk. A personal record, not legal advice.</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  /*LOGIC*/
+  var LIMIT = 180, WARN = 150, DAY = 864e5;
+  function toDay(iso) { var p = iso.split('-').map(Number); return Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / DAY); }
+  function fromDay(n) { return new Date(n * DAY); }
+  function fmt(n) { return fromDay(n).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); }
+  function windowStart(t) { var d = fromDay(t); return Math.round(Date.UTC(d.getUTCFullYear() - 1, d.getUTCMonth(), d.getUTCDate()) / DAY) + 1; }
+  function addYears(n, y) { var d = fromDay(n); return Math.round(Date.UTC(d.getUTCFullYear() + y, d.getUTCMonth(), d.getUTCDate()) / DAY); }
+  function tripSpan(t, today) {
+    var e = toDay(t.exit);
+    var r = t.entry ? toDay(t.entry) : Math.max(today + 1, e + 1);
+    return { e: e, r: r, days: Math.max(0, r - e - 1) };
+  }
+  function analyse(trips, today, arrival) {
+    var A = toDay(arrival);
+    var spans = trips.map(function (t) { return tripSpan(t, today); });
+    var last = Math.max(today, A);
+    spans.forEach(function (s) { last = Math.max(last, s.e, s.r); });
+    var n = last + 30 - A + 1;
+    var abs = new Uint8Array(n);
+    spans.forEach(function (s) {
+      for (var d = s.e + 1; d < s.r; d++) { var i = d - A; if (i >= 0 && i < n) abs[i] = 1; }
+    });
+    var pre = new Int32Array(n + 1);
+    for (var i = 0; i < n; i++) pre[i + 1] = pre[i] + abs[i];
+    var peak = 0, peakI = 0;
+    for (var k = 0; k < n; k++) {
+      var s0 = Math.max(A, windowStart(A + k)) - A;
+      var v = pre[k + 1] - pre[s0];
+      if (v > peak) { peak = v; peakI = k; }
+    }
+    var ti = Math.min(n - 1, Math.max(0, today - A));
+    var s1 = Math.max(A, windowStart(A + ti)) - A;
+    return { A: A, n: n, pre: pre, peak: peak, peakI: peakI, now: pre[ti + 1] - pre[s1], total: pre[ti + 1], spans: spans };
+  }
+  function countAbs(a, from, to) {
+    var i0 = Math.max(0, from - a.A), i1 = Math.min(a.n, to - a.A);
+    return i1 > i0 ? a.pre[i1] - a.pre[i0] : 0;
+  }
+  function ymd(a0, b0) {
+    var f = fromDay(a0), t = fromDay(b0);
+    var y = t.getUTCFullYear() - f.getUTCFullYear(), m = t.getUTCMonth() - f.getUTCMonth(), d = t.getUTCDate() - f.getUTCDate();
+    if (d < 0) { m--; d += new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 0)).getUTCDate(); }
+    if (m < 0) { y--; m += 12; }
+    return { y: y, m: m, d: d };
+  }
+  function level(v) { return v > LIMIT ? 'crit' : (v >= WARN ? 'warn' : 'ok'); }
+  function validate(v, arrival) {
+    if (!v.place.trim()) return 'Add a destination.';
+    if (!v.exit) return 'Enter the date you left the UK.';
+    if (toDay(v.exit) < toDay(arrival)) return 'The leaving date is before the arrival on ' + fmt(toDay(arrival)) + '.';
+    if (v.entry && toDay(v.entry) <= toDay(v.exit)) return 'The return date must be after the leaving date.';
+    return '';
+  }
+  /*END*/
+
+  var nd = new Date();
+  var TODAY = toDay(nd.getFullYear() + '-' + String(nd.getMonth() + 1).padStart(2, '0') + '-' + String(nd.getDate()).padStart(2, '0'));
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+  var DEFAULTS = { a: { name: 'Me', arrival: '2023-04-30' }, b: { name: 'Wife', arrival: '2023-04-30' } };
+
+  /* ---------- state + storage ---------- */
+  var trips = [], people = JSON.parse(JSON.stringify(DEFAULTS)), cur = 'a';
+  var loaded = false, mode = 'pending', canWrite = true, col = null, setCol = null, editingId = null;
+  var LS = 'ilr-travel-v2';
+
+  function lsRead() { try { return JSON.parse(localStorage.getItem(LS) || 'null') || {}; } catch (e) { return {}; } }
+  function lsWrite() { try { localStorage.setItem(LS, JSON.stringify({ trips: trips, people: people })); } catch (e) {} }
+  function tripsOf(w) { return trips.filter(function (t) { return (t.who || 'a') === w; }); }
+  function mergePeople(p) {
+    ['a', 'b'].forEach(function (w) {
+      if (p && p[w]) people[w] = { name: p[w].name || DEFAULTS[w].name, arrival: p[w].arrival || DEFAULTS[w].arrival };
+    });
+  }
+
+  async function savePeople() {
+    if (mode === 'db') { try { await setCol.doc('people').set(people); } catch (e) { $('formErr').textContent = 'The profile could not be saved.'; } }
+    else lsWrite();
+  }
+  async function saveTrip(v, id) {
+    var data = { kind: v.kind === 'business' ? 'business' : 'holiday', who: cur, place: v.place.trim(), exit: v.exit, entry: v.entry || '', note: (v.note || '').trim() };
+    if (mode === 'db') { await (id ? col.doc(id) : col.doc()).set(data); }
+    else {
+      if (id) trips = trips.map(function (t) { return t.id === id ? Object.assign({ id: id }, data) : t; });
+      else trips = trips.concat([Object.assign({ id: 't' + Date.now().toString(36) }, data)]);
+      lsWrite(); render();
+    }
+  }
+  async function deleteTrip(id) {
+    if (mode === 'db') await col.doc(id).delete();
+    else { trips = trips.filter(function (t) { return t.id !== id; }); lsWrite(); render(); }
+  }
+
+  async function init() {
+    var db = null, user = null;
+    try {
+      if (window.claude && window.claude.use) {
+        db = await window.claude.use('db');
+        if (db) user = await window.claude.use('user');
+      }
+    } catch (e) { db = null; }
+    if (db) {
+      mode = 'db'; col = db.collection('trips'); setCol = db.collection('settings');
+      canWrite = !(user && user.can && user.can('data.write') === false);
+      var timer = setTimeout(function () { if (!loaded) $('syncNote').textContent = 'Saved trips cannot be reached yet. Showing what is loaded.'; }, 10000);
+      setCol.doc('people').onSnapshot(function (d) { if (d.exists) { mergePeople(d.data()); fillProfile(false); render(); } }, function () {});
+      col.onSnapshot(function (snap) {
+        trips = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        if (!snap.metadata.fromCache || snap.size) { loaded = true; clearTimeout(timer); }
+        setSyncNote(); render();
+      }, function () { $('syncNote').textContent = 'Saved trips could not be loaded. Reload the page to try again.'; loaded = true; render(); });
+    } else {
+      mode = 'local';
+      var s = lsRead(); trips = s.trips || []; mergePeople(s.people);
+      loaded = true; setSyncNote(); fillProfile(true); render();
+    }
+  }
+  function setSyncNote() {
+    var n = $('syncNote');
+    if (mode === 'local') n.textContent = 'Not signed in, so trips are saved in this browser only.';
+    else if (!canWrite) n.textContent = 'You can view these trips but not change them. Ask the owner for Contributor access.';
+    else n.textContent = 'Saved to this page and shared with anyone you give Contributor access.';
+    document.querySelectorAll('#tripForm input, #saveBtn, #pName, #pArrival').forEach(function (el) { el.disabled = !canWrite; });
+  }
+
+  /* ---------- rendering ---------- */
+  var all = {};
+  function render() {
+    ['a', 'b'].forEach(function (w) { all[w] = analyse(tripsOf(w), TODAY, people[w].arrival); });
+    renderTabs(); renderCountdown(all[cur]); renderYears(all[cur]); renderStatus(all[cur]); renderList(all[cur]); updateDraft();
+    $('exitDate').min = people[cur].arrival; $('entryDate').min = people[cur].arrival;
+  }
+  function renderTabs() {
+    $('tabs').innerHTML = ['a', 'b'].map(function (w) {
+      var lv = level(all[w].now);
+      return '<button type="button" class="tab" data-w="' + w + '" aria-pressed="' + (w === cur) + '"><span class="n">' + esc(people[w].name) + '</span><span class="v ' + lv + '">' + all[w].now + ' of 180 days</span></button>';
+    }).join('');
+  }
+  function renderStatus(a) {
+    var lv = level(a.now);
+    $('nowVal').textContent = a.now;
+    $('nowPill').className = 'pill ' + lv;
+    $('nowPill').textContent = lv === 'ok' ? 'Within the limit' : lv === 'warn' ? 'Close to the limit' : 'Over the limit';
+    $('meter').className = 'meter ' + (lv === 'ok' ? '' : lv);
+    $('meterFill').style.width = Math.min(100, a.now / LIMIT * 100) + '%';
+    var left = LIMIT - a.now;
+    $('nowText').innerHTML = left >= 0
+      ? '<strong>' + plural(left, 'day') + '</strong> left before 180 in the 12 months to ' + fmt(TODAY) + '.'
+      : '<strong>' + plural(-left, 'day') + ' over</strong> the limit in the 12 months to ' + fmt(TODAY) + '.';
+    var pv = $('peakVal'); pv.textContent = plural(a.peak, 'day'); pv.style.color = a.peak > LIMIT ? 'var(--crit)' : '';
+    if (a.peak === 0) $('peakSub').textContent = 'No days abroad recorded.';
+    else { var pe = a.A + a.peakI; $('peakSub').textContent = fmt(Math.max(a.A, windowStart(pe))) + ' to ' + fmt(pe) + (pe > TODAY ? ' (includes planned)' : ''); }
+  }
+  function ymdText(r) {
+    var p = [];
+    if (r.y) p.push(plural(r.y, 'year'));
+    if (r.m) p.push(plural(r.m, 'month'));
+    if (r.d) p.push(plural(r.d, 'day'));
+    if (!p.length) return '0 days';
+    return p.length > 1 ? p.slice(0, -1).join(', ') + ' and ' + p[p.length - 1] : p[0];
+  }
+  function renderCountdown(a) {
+    var five = addYears(a.A, 5), from = five - 28, togo = from - TODAY, pill = $('cdPill');
+    if (togo > 0) {
+      $('cdVal').textContent = togo;
+      $('cdUnit').textContent = togo === 1 ? 'day until you can apply' : 'days until you can apply';
+      pill.className = 'pill idle'; pill.textContent = 'Not open yet';
+      $('cdText').innerHTML = 'That is <strong>' + ymdText(ymd(TODAY, from)) + '</strong>. You can apply from ' + fmt(from) + '.';
+    } else {
+      $('cdVal').textContent = 'Now';
+      $('cdUnit').textContent = 'you can apply';
+      pill.className = 'pill ok'; pill.textContent = 'Window open';
+      $('cdText').innerHTML = five > TODAY ? 'Five years complete in <strong>' + plural(five - TODAY, 'day') + '</strong>, on ' + fmt(five) + '.'
+        : five === TODAY ? 'Five years complete <strong>today</strong>.' : 'Five years completed on ' + fmt(five) + '.';
+    }
+    var pct = Math.max(0, Math.min(100, (TODAY - a.A) / (five - a.A) * 100));
+    $('cdFill').style.width = pct + '%';
+    $('cdFrom').textContent = fmt(a.A); $('cdTo').textContent = fmt(five); $('cdPct').textContent = Math.floor(pct) + '% of five years';
+    $('cdApply').textContent = fmt(from);
+    $('cdFive').textContent = fmt(five);
+    $('cdFiveSub').textContent = five > TODAY ? ymdText(ymd(TODAY, five)) + ' to go' : 'Reached';
+  }
+  function renderYears(a) {
+    var five = addYears(a.A, 5), so = countAbs(a, a.A, TODAY + 1), all5 = countAbs(a, a.A, five), cum = 0, html = '';
+    $('cumVal').textContent = so;
+    $('cumText').textContent = all5 > so
+      ? 'Plus ' + plural(all5 - so, 'day') + ' in planned trips, ' + all5 + ' by ' + fmt(five) + '.'
+      : 'Since ' + fmt(a.A) + '. No more days are planned before ' + fmt(five) + '.';
+    for (var y = 0; y < 5; y++) {
+      var s = addYears(a.A, y), e = addYears(a.A, y + 1), d = countAbs(a, s, e), cur = s <= TODAY && TODAY < e, ahead = s > TODAY;
+      cum += d;
+      html += '<tr class="' + (ahead ? 'ahead' : '') + '"><td class="yr"><b>Year ' + (y + 1) + '</b>' + (cur ? ' (now)' : '') + (ahead ? ' (planned only)' : '') +
+        '<small>' + fmt(s) + ' to ' + fmt(e - 1) + '</small></td><td class="r num">' + d + '</td><td class="r num">' + cum + '</td></tr>';
+    }
+    $('yearsBody').innerHTML = html;
+  }
+  function renderList(a) {
+    var body = $('listBody'), mine = tripsOf(cur);
+    $('h-list').textContent = 'Trips for ' + people[cur].name;
+    $('h-add').textContent = (editingId ? 'Edit trip for ' : 'Add a trip for ') + people[cur].name;
+    if (!loaded) { body.innerHTML = '<div class="empty">Loading trips…</div>'; $('listCount').textContent = ''; return; }
+    if (!mine.length) {
+      body.innerHTML = '<div class="empty">No trips yet. Add each time ' + esc(people[cur].name) + ' left the UK since ' + fmt(a.A) + ', and any trips already booked.</div>';
+      $('listCount').textContent = ''; return;
+    }
+    var rows = mine.map(function (t, i) { return { t: t, s: a.spans[i] }; }).sort(function (x, y) { return y.s.e - x.s.e; });
+    $('listCount').textContent = plural(rows.length, 'trip') + ', ' + plural(rows.reduce(function (n, r) { return n + r.s.days; }, 0), 'day') + ' counted';
+    var html = '<ul class="trips">';
+    rows.forEach(function (r) {
+      var t = r.t, s = r.s, planned = s.e > TODAY, away = !planned && (!t.entry || s.r > TODAY);
+      var tag = planned ? '<span class="tag plan">Planned</span>' : (away ? '<span class="tag now">Away now</span>' : '');
+      html += '<li class="trip"><div><div class="place">' + esc(t.place) + '<span class="tag">' + (t.kind === 'business' ? 'Business' : 'Holiday') + '</span>' + tag + '</div>' +
+        '<div class="dates">' + fmt(s.e) + ' to ' + (t.entry ? fmt(s.r) : 'not back yet') + '</div>' +
+        (t.note ? '<div class="tnote">' + esc(t.note) + '</div>' : '') + '</div>' +
+        '<div class="side"><div class="days">' + s.days + ' <small>' + (s.days === 1 ? 'day' : 'days') + '</small></div>' +
+        (canWrite ? '<div><button type="button" class="link" data-act="edit" data-id="' + esc(t.id) + '">Edit</button> <button type="button" class="link danger" data-act="del" data-id="' + esc(t.id) + '">Delete</button></div>' : '') +
+        '</div></li>';
+    });
+    body.innerHTML = html + '</ul>';
+  }
+
+  /* ---------- profile ---------- */
+  function fillProfile(force) {
+    var f = document.activeElement;
+    if (!force && (f === $('pName') || f === $('pArrival'))) return;
+    $('pName').value = people[cur].name; $('pArrival').value = people[cur].arrival;
+  }
+  $('tabs').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-w]'); if (!b || b.getAttribute('data-w') === cur) return;
+    cur = b.getAttribute('data-w'); resetForm(); fillProfile(true); render();
+  });
+  $('pName').addEventListener('change', function () { people[cur].name = $('pName').value.trim() || DEFAULTS[cur].name; $('pName').value = people[cur].name; savePeople(); render(); });
+  $('pArrival').addEventListener('change', function () { if (!$('pArrival').value) { $('pArrival').value = people[cur].arrival; return; } people[cur].arrival = $('pArrival').value; savePeople(); render(); });
+
+  /* ---------- form ---------- */
+  function formValues() {
+    return { kind: document.querySelector('input[name="kind"]:checked').value, place: $('place').value, exit: $('exitDate').value, entry: $('entryDate').value, note: $('note').value };
+  }
+  function updateDraft() {
+    var box = $('draft'), v = formValues(), arr = people[cur].arrival;
+    box.className = 'draft';
+    if (!v.exit || toDay(v.exit) < toDay(arr) || (v.entry && toDay(v.entry) <= toDay(v.exit))) { box.textContent = ''; return; }
+    var others = tripsOf(cur).filter(function (t) { return t.id !== editingId; });
+    var b = analyse(others.concat([{ exit: v.exit, entry: v.entry }]), TODAY, arr);
+    var sp = tripSpan({ exit: v.exit, entry: v.entry }, TODAY);
+    box.className = 'draft ' + level(b.peak);
+    box.textContent = 'This trip counts ' + plural(sp.days, 'day') + (v.entry ? '' : ' so far') + '. Busiest 12 months would reach ' + b.peak + ' of 180' + (b.peak > LIMIT ? ', over the limit.' : '.');
+  }
+  function resetForm() {
+    editingId = null; $('tripForm').reset();
+    $('saveBtn').textContent = 'Add trip'; $('cancelBtn').hidden = true; $('formErr').textContent = '';
+    updateDraft(); if (loaded) renderList(all[cur] || analyse(tripsOf(cur), TODAY, people[cur].arrival));
+  }
+  $('tripForm').addEventListener('input', function () { $('formErr').textContent = ''; updateDraft(); });
+  $('tripForm').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    if (!canWrite) return;
+    var v = formValues(), err = validate(v, people[cur].arrival);
+    if (err) { $('formErr').textContent = err; return; }
+    $('saveBtn').disabled = true;
+    try { await saveTrip(v, editingId); resetForm(); }
+    catch (e) { $('formErr').textContent = 'The trip could not be saved. Check your connection and try again.'; }
+    $('saveBtn').disabled = !canWrite;
+  });
+  $('cancelBtn').addEventListener('click', resetForm);
+
+  var delTimer = null;
+  $('listBody').addEventListener('click', async function (ev) {
+    var b = ev.target.closest('button[data-act]'); if (!b) return;
+    var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+    if (act === 'edit') {
+      var t = trips.filter(function (x) { return x.id === id; })[0]; if (!t) return;
+      editingId = id;
+      $(t.kind === 'business' ? 'kind-business' : 'kind-holiday').checked = true;
+      $('place').value = t.place; $('exitDate').value = t.exit; $('entryDate').value = t.entry || ''; $('note').value = t.note || '';
+      $('saveBtn').textContent = 'Save changes'; $('cancelBtn').hidden = false;
+      renderList(all[cur]); updateDraft(); $('tripForm').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else if (act === 'del') {
+      if (b.getAttribute('data-armed') !== '1') {
+        b.setAttribute('data-armed', '1'); b.textContent = 'Confirm delete';
+        clearTimeout(delTimer);
+        delTimer = setTimeout(function () { b.removeAttribute('data-armed'); b.textContent = 'Delete'; }, 4000);
+        return;
+      }
+      try { await deleteTrip(id); if (editingId === id) resetForm(); }
+      catch (e) { $('formErr').textContent = 'The trip could not be deleted. Try again.'; }
+    }
+  });
+
+  fillProfile(true);
+  render();
+  init();
+})();
+</script>
+
+</body></html>
